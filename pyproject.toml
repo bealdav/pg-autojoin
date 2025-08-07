@@ -1,6 +1,6 @@
 [project]
 name = "pg-autojoin"
-version = "0.1.0"
+version = "0.2.0"
 description = "Make a generic sql query with auto-join support for PostgreSQL towards foreign keys."
 readme = "README.md"
 requires-python = ">=3.13"
