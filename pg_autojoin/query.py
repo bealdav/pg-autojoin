@@ -30,3 +30,13 @@ def get_foreign_keys_query(table: str):
           AND tc.table_name = '{table}'
       ORDER BY ccu.table_name
       """
+
+
+def get_columns_in_tables(tables: list, column_names: list):
+    return f"""
+    SELECT table_name AS "table", column_name AS "column" 
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name IN {tuple(tables)}
+      AND column_name IN {tuple(column_names)}
+    """

@@ -1,9 +1,22 @@
 [project]
 name = "pg-autojoin"
-version = "0.2.0"
+version = "0.3.0"
 description = "Make a generic sql query with auto-join support for PostgreSQL towards foreign keys."
 readme = "README.md"
-requires-python = ">=3.13"
+license = { text = "AGPL-3.0-or-later" }
+requires-python = ">=3.10"
+authors = [
+    { name = "David BEAL", email = "david.beal@akretion.com" },
+]
+maintainers = [
+    { name = "David BEAL", email = "david.beal@akretion.com" },
+]
 dependencies = [
     "connectorx>=0.4.3",
 ]
+keywords = [ "postgresql", "foreign keys", "sql", "join" ]
+
+[project.urls]
+homepage = "https://github.com/bealdav/pg-autojoin/README.md"
+repository = "https://github.com/bealdav/pg-autojoin"
+documentation = "https://github.com/bealdav/pg-autojoin/README.md"
