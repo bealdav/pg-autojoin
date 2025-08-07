@@ -5,9 +5,9 @@ Make a generic sql query with auto-join for PostgreSQL towards foreign keys.
 
 ```python
 
-from pg_autojoin.db import DB
+from pg_autojoin import SqlJoin
 
-conn = DB(db="mydb", user="me", password="1234")
+conn = SqlJoin(db="mydb", user="me", password="1234")
 # host and port are optional, default to localhost
 
 conn.get_joins(table="res_users")
@@ -33,7 +33,9 @@ Dataset comes from [Odoo business app](https://github.com/odoo/odoo), but you ca
 ```python
 
 # define your own alias, but it's not a mandatory step
-conn.set_alias({"res_company": "c", "res_partner": "p", 'res_users': 'u'})
+conn.set_alias(
+    {"res_company": "c", "res_partner": "p", 'res_users': 'u'}
+)
 
 conn.get_joined_query(table="res_users")
 
@@ -55,7 +57,7 @@ SELECT u.* FROM res_users u
 
 You may dynamically want to produce dataframes with relevant data only based on a source table.
 
-Have directly all joins might help a lot to specify the data to get back.
+Have directly all joins might help a lot to specify the relevant data to get back.
 
 
 # Installation

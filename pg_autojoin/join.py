@@ -8,14 +8,13 @@ from .query import get_foreign_keys_query
 logger = logging.getLogger(__name__)
 
 
-class DB:
-
+class SqlJoin:
     # dsn
     conn: str
     # alias mapping for table names
     alias: dict = None
 
-    def __init__(self, db, user, password, host="localhost", port=5432):
+    def __init__(self, db, user, password, host="localhost", port=5432) -> None:
         self.conn = f"postgres://{user}:{password}@{host}:{port}/{db}"
 
     def get_joins(self, table, dataframe=True):
@@ -65,8 +64,10 @@ class DB:
         for fk in foreign_keys:
             # we record the count of each table to handle aliases
             tbl_cnt[fk["to_table"]] += 1
+            # search for an existing alias
             foreign_alias = get_alias_cnt(fk["to_table"])
             joins.append(
+                # compute join
                 f"\n  LEFT JOIN {fk['to_table']} {foreign_alias} ON "
                 + f"{foreign_alias or fk['to_table']}"
                 + f".{fk['column']} = {t_alias or table}.{fk['foreign_key']}"
