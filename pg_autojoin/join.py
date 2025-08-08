@@ -76,7 +76,10 @@ class SqlJoin:
                 # i.e. cols_by_tbl contains such data
                 # {'res_company': ['name'], 'res_partner': ['name', 'ref']}
                 col_names.append(
-                    [f"{foreign_alias}.{x}" for x in cols_by_tbl[fk["to_table"]]]
+                    [
+                        f"{foreign_alias}.{x} AS {foreign_alias}_{x}"
+                        for x in cols_by_tbl[fk["to_table"]]
+                    ]
                 )
             joins.append(
                 # compute join: i.e. LEFT JOIN res_users u2 ON u2.id = u.create_uid
@@ -97,9 +100,10 @@ class SqlJoin:
             logger.warning(f"No joins found for the table '{table}'.")
             return False
         sql = (
-            f"SELECT {col_str} {tb_alias + '.'}* FROM {table} {tb_alias} {join_clause}"
+            f"SELECT {col_str} {tb_alias + '.'}*\nFROM {table} {tb_alias} {join_clause}"
         )
-        return print("\n", sql, "\n")
+        print(sql)
+        return sql
 
     def _search_columns(self, tables: list):
         """search for self.columns in the given tables."""
