@@ -63,7 +63,7 @@ class SqlJoin:
         aliases = self.aliases or {}
         tb_count = defaultdict(int)
         foreigns = self.get_joins(table, dataframe=False)
-        if self.columns:
+        if self.columns and foreigns:
             cols_by_tbl = self._search_columns(set(x["to_table"] for x in foreigns))
         tb_alias = aliases.get(table, "")
         tb_count[table] = 1
@@ -93,6 +93,9 @@ class SqlJoin:
             sql = f"SELECT {tb_alias + '.'}* , {col_names} FROM {table} {tb_alias} "
         col_str = cols_list and ", ".join(cols_list) + "," or ""
         join_clause = " ".join(joins)
+        if not joins:
+            logger.warning(f"No joins found for the table '{table}'.")
+            return False
         sql = (
             f"SELECT {col_str} {tb_alias + '.'}* FROM {table} {tb_alias} {join_clause}"
         )
