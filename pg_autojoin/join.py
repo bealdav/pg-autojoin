@@ -53,18 +53,19 @@ class SqlJoin:
         """
 
         def get_alias_count(tbl):
-            result = f"{self.aliases.get(tbl, tbl)}"
+            result = f"{aliases.get(tbl, tbl)}"
             if tb_count[tbl] > 1:
                 result += f"{tb_count[tbl]}"
             return result
 
         joins, col_names = [], []
-        cols_by_tbl = {}
+        tb_alias, cols_by_tbl = {}, {}
+        aliases = self.aliases or {}
         tb_count = defaultdict(int)
         foreigns = self.get_joins(table, dataframe=False)
         if self.columns:
             cols_by_tbl = self._search_columns(set(x["to_table"] for x in foreigns))
-        tb_alias = self.aliases.get(table, "")
+        tb_alias = aliases.get(table, "")
         tb_count[table] = 1
         for fk in foreigns:
             # we record the count of each table to handle aliases
