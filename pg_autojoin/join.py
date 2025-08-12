@@ -97,13 +97,14 @@ class SqlJoin:
         col_str = cols_list and ", ".join(cols_list) + "," or ""
         join_clause = " ".join(joins)
         if not joins:
-            logger.warning(f"No joins found for the table '{table}'.")
-            return False
+            logger.info(f"No joins found for '{table}' table.")
+            return False, False
+        asterisk_cols = f"{tb_alias}.*"
         sql = (
-            f"SELECT {col_str} {tb_alias + '.'}*\nFROM {table} {tb_alias} {join_clause}"
+            f"SELECT {col_str} {asterisk_cols}\nFROM {table} {tb_alias} {join_clause}"
         )
-        print(sql)
-        return sql
+        logger.info(f"Sql generated for '{table}' table")
+        return sql, asterisk_cols
 
     def _search_columns(self, tables: list):
         """search for self.columns in the given tables."""

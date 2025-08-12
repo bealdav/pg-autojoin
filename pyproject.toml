@@ -14,7 +14,7 @@ maintainers = [
 dependencies = [
     "connectorx>=0.4.3",
 ]
-keywords = [ "postgresql", "foreign keys", "sql", "join" ]
+keywords = [ "postgresql", "foreign keys", "sql", "join", "connectorx" ]
 
 [project.urls]
 homepage = "https://github.com/bealdav/pg-autojoin/README.md"
