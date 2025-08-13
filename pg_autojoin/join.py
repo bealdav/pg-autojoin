@@ -41,7 +41,7 @@ class SqlJoin:
         else:
             return result.to_dicts()
 
-    def get_joined_query(self, table: str) -> str:
+    def get_joined_query(self, table: str) -> (str, str):
         """
         Returns a query to fetch joined data based on foreign keys for a specific table.
 
@@ -50,6 +50,7 @@ class SqlJoin:
 
         Returns:
             SQL query string to fetch joined data.
+            string for asterisk columns like `table.*`.
         """
 
         def as_clause_override(value):

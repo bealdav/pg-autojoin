@@ -67,10 +67,11 @@ but you can use it with any PostgreSQL database.
 
 # define your own aliases (it's not a mandatory step)
 conn.set_aliases(
-    {"res_company": "c", "res_partner": "p", 'res_users': 'u'}
+    {"res_company": "company", "res_partner": "partner", 'res_users': 'user_'}
 )
 
-conn.get_joined_query(table="res_users")
+sql, _ = conn.get_joined_query(table="res_users")
+print(sql)
 
 ```
 
@@ -78,11 +79,11 @@ give an auto-joined query output
 
 
 ```sql
-SELECT u.* FROM res_users u 
-  LEFT JOIN res_company c ON c.id = u.company_id 
-  LEFT JOIN res_partner p ON p.id = u.partner_id 
-  LEFT JOIN res_users u2 ON u2.id = u.create_uid 
-  LEFT JOIN res_users u3 ON u3.id = u.write_uid
+SELECT user_.* FROM res_users users_
+  LEFT JOIN res_company company ON company.id = user_.company_id
+  LEFT JOIN res_partner partner ON partner.id = user_.partner_id
+  LEFT JOIN res_users user_2 ON user_2.id = user_.create_uid
+  LEFT JOIN res_users user_3 ON user_3.id = user_.write_uid
 ```
 
 
@@ -91,17 +92,21 @@ SELECT u.* FROM res_users u
 # from foreign table you may specify before previous command
 
 conn.set_columns_to_retrieve(["name", "ref", "code"])
+sql, _ = conn.get_joined_query(table="res_users")
+print(sql)
 
 ```
 
 with this result
 
 ```sql
- SELECT c.name, p.name, p.ref, u.* FROM res_users u 
-  LEFT JOIN res_company c ON c.id = u.company_id 
-  LEFT JOIN res_partner p ON p.id = u.partner_id 
-  LEFT JOIN res_users u2 ON u2.id = u.create_uid 
-  LEFT JOIN res_users u3 ON u3.id = u.write_uid 
+SELECT company.name AS "company", partner.name AS "partner"
+  , partner.ref AS "partner_ref", user_.* 
+FROM res_users user_
+  LEFT JOIN res_company company ON company.id = user_.company_id
+  LEFT JOIN res_partner partner ON partner.id = user_.partner_id
+  LEFT JOIN res_users user_2 ON user_2.id = user_.create_uid
+  LEFT JOIN res_users user_3 ON user_3.id = user_.write_uid
 ```
 
 ## Use case
