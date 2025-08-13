@@ -52,6 +52,13 @@ class SqlJoin:
             SQL query string to fetch joined data.
         """
 
+        def as_clause_override(value):
+            # TODO allow to have space instead of _
+            result = f"_{value}"
+            if value == "name":
+                result = ""
+            return result
+
         def get_alias_count(tbl):
             result = f"{aliases.get(tbl, tbl)}"
             if tb_count[tbl] > 1:
@@ -77,7 +84,7 @@ class SqlJoin:
                 # {'res_company': ['name'], 'res_partner': ['name', 'ref']}
                 col_names.append(
                     [
-                        f"{foreign_alias}.{x} AS {foreign_alias}_{x}"
+                        f'{foreign_alias}.{x} AS "{foreign_alias}{as_clause_override(x)}"'
                         for x in cols_by_tbl[fk["to_table"]]
                     ]
                 )
@@ -100,9 +107,7 @@ class SqlJoin:
             logger.info(f"No joins found for '{table}' table.")
             return False, False
         asterisk_cols = f"{tb_alias}.*"
-        sql = (
-            f"SELECT {col_str} {asterisk_cols}\nFROM {table} {tb_alias} {join_clause}"
-        )
+        sql = f"SELECT {col_str} {asterisk_cols}\nFROM {table} {tb_alias} {join_clause}"
         logger.info(f"Sql generated for '{table}' table")
         return sql, asterisk_cols
 
