@@ -34,7 +34,7 @@ def get_foreign_keys_query(table: str):
 
 def get_columns_in_tables(tables: list, column_names: list):
     return f"""
-    SELECT table_name AS "table", column_name AS "column" 
+    SELECT table_name AS "table", column_name AS "column", data_type
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name IN {tuple(tables)}

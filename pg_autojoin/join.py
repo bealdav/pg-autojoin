@@ -67,12 +67,14 @@ class SqlJoin:
             return result
 
         joins, col_names = [], []
-        tb_alias, cols_by_tbl = {}, {}
+        tb_alias, cols_by_tbl, json_by_tbl = {}, {}, {}
         aliases = self.aliases or {}
         tb_count = defaultdict(int)
         foreigns = self.get_joins(table, dataframe=False)
         if self.columns and foreigns:
-            cols_by_tbl = self._search_columns(set(x["to_table"] for x in foreigns))
+            cols_by_tbl, json_by_tbl = self._search_columns(
+                set(x["to_table"] for x in foreigns)
+            )
         tb_alias = aliases.get(table, "")
         tb_count[table] = 1
         for fk in foreigns:
@@ -83,32 +85,47 @@ class SqlJoin:
             if cols_by_tbl.get(fk["to_table"]):
                 # i.e. cols_by_tbl contains such data
                 # {'res_company': ['name'], 'res_partner': ['name', 'ref']}
-                col_names.append(
-                    [
-                        f'{foreign_alias}.{x} AS "{foreign_alias}{as_clause_override(x)}"'
-                        for x in cols_by_tbl[fk["to_table"]]
-                    ]
-                )
+                for col in cols_by_tbl[fk["to_table"]]:
+                    already_col = [x for x in col_names if fk["foreign_key"] in x]
+                    if already_col:
+                        # a field is already set with this foreign key
+                        if json_by_tbl.get(fk["to_table"]):
+                            # there is a jsonb in selected column,
+                            # we can't aggregate easily jsonb with other column
+                            # then we stop process for this table
+                            continue
+                        idx = already_col[0].find(fk["foreign_key"])
+                        new_col = f"{foreign_alias}.{col}"
+                        replacement = already_col[0].replace(
+                            " AS", f" || ', ' || {new_col} AS"
+                        )
+                        col_names[col_names.index(already_col[0])] = replacement
+                    else:
+                        # here we keep the original column i.e. partner_id
+                        col_names.append(
+                            f'{foreign_alias}.{col} AS "{fk["foreign_key"]}'
+                            + f'{as_clause_override(col)}"'
+                        )
             joins.append(
                 # compute join: i.e. LEFT JOIN res_users u2 ON u2.id = u.create_uid
                 f"\n  LEFT JOIN {fk['to_table']} {foreign_alias} ON "
                 + f"{foreign_alias or fk['to_table']}"
                 + f".{fk['column']} = {tb_alias or table}.{fk['foreign_key']}"
             )
-        cols_list = []
+        col_str, cols_list = "", []
         if col_names:
             # col_names contains such data [['c.name'], ['p.name', 'p.ref']]
-            cols = [x.split(",") for x in [",".join(x) for x in col_names]]
-            # we fill cols_list
-            [cols_list.extend(x) for x in cols]
-            sql = f"SELECT {tb_alias + '.'}* , {col_names} FROM {table} {tb_alias} "
-        col_str = cols_list and ", ".join(cols_list) + "," or ""
+            cols = []
+            for x in col_names:
+                cols.append(x)
+            col_str = ", ".join(col_names) + ","
         join_clause = " ".join(joins)
         if not joins:
             logger.info(f"No joins found for '{table}' table.")
             return False, False
         asterisk_cols = f"{tb_alias}.*"
-        sql = f"SELECT {col_str} {asterisk_cols}\nFROM {table} {tb_alias} {join_clause}"
+        sql = f"SELECT {col_str} {tb_alias or table}{asterisk_cols}\n"
+        sql += f"FROM {table} {tb_alias} {join_clause}"
         logger.info(f"Sql generated for '{table}' table")
         return sql, asterisk_cols
 
@@ -116,8 +133,17 @@ class SqlJoin:
         """search for self.columns in the given tables."""
         sql = get_columns_in_tables(tables=tables, column_names=self.columns)
         df = cx.read_sql(self.conn, sql, return_type="polars")
-        dicts = df.group_by("table").agg(pl.col("column")).to_dicts()
-        return {x["table"]: x["column"] for x in dicts}
+        cols_by_tbl = {
+            x["table"]: x["column"]
+            for x in df.group_by("table").agg(pl.col("column")).to_dicts()
+        }
+        json_by_tbl = {
+            x["table"]: x["column"]
+            for x in df.filter(pl.col("data_type") == "jsonb")
+            .select(["table", "column"])
+            .to_dicts()
+        }
+        return cols_by_tbl, json_by_tbl
 
     def set_aliases(self, aliases: dict[str, str]) -> None:
         """
@@ -130,9 +156,9 @@ class SqlJoin:
 
     def set_columns_to_retrieve(self, columns: list) -> None:
         """
-        Sets an alias mapping for table names.
+        Sets columns to search in foreign tables
 
         Args:
-            alias (dict): A dictionary mapping original table names to their aliases.
+            columns: list of columns to search in foreign tables
         """
         self.columns = columns

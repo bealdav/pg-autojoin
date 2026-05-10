@@ -79,7 +79,7 @@ give an auto-joined query output
 
 
 ```sql
-SELECT user_.* FROM res_users users_
+SELECT user_.* FROM res_users user_
   LEFT JOIN res_company company ON company.id = user_.company_id
   LEFT JOIN res_partner partner ON partner.id = user_.partner_id
   LEFT JOIN res_users user_2 ON user_2.id = user_.create_uid
@@ -100,9 +100,10 @@ print(sql)
 with this result
 
 ```sql
-SELECT company.name AS "company", partner.name AS "partner"
-  , partner.ref AS "partner_ref", user_.* 
-FROM res_users user_
+SELECT company.name AS "company_id"
+  , partner.name || ', ' || partner.ref AS "partner_id"
+  , user_user_.*
+FROM res_users user_ 
   LEFT JOIN res_company company ON company.id = user_.company_id
   LEFT JOIN res_partner partner ON partner.id = user_.partner_id
   LEFT JOIN res_users user_2 ON user_2.id = user_.create_uid
