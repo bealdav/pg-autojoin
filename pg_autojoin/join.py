@@ -3,7 +3,12 @@ import polars as pl
 from collections import defaultdict
 import logging
 
-from .query import get_foreign_keys_query, get_columns_in_tables
+from .query import (
+    get_foreign_keys_query,
+    get_columns_in_tables,
+    get_json_col_in_tables,
+    get_keys_in_json_col,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +32,8 @@ class SqlJoin:
         port: int = 5432,
     ) -> None:
         self.conn = f"postgres://{user}:{password}@{host}:{port}/{db}"
+        json_key_pref = None
+        fallback_json_key = None
 
     def get_joins(self, table, dataframe=True):
         query = get_foreign_keys_query(table)
@@ -50,15 +57,7 @@ class SqlJoin:
 
         Returns:
             SQL query string to fetch joined data.
-            string for asterisk columns like `table.*`.
         """
-
-        def as_clause_override(value):
-            # TODO allow to have space instead of _
-            result = f"_{value}"
-            if value == "name":
-                result = ""
-            return result
 
         def get_alias_count(tbl):
             result = f"{aliases.get(tbl, tbl)}"
@@ -66,15 +65,15 @@ class SqlJoin:
                 result += f"{tb_count[tbl]}"
             return result
 
-        joins, col_names = [], []
+        joins, cols = [], {}
         tb_alias, cols_by_tbl, json_by_tbl = {}, {}, {}
         aliases = self.aliases or {}
         tb_count = defaultdict(int)
         foreigns = self.get_joins(table, dataframe=False)
         if self.columns and foreigns:
-            cols_by_tbl, json_by_tbl = self._search_columns(
-                set(x["to_table"] for x in foreigns)
-            )
+            tables = list(x["to_table"] for x in foreigns)
+            tables.append(table)
+            cols_by_tbl, json_by_tbl = self._search_columns(set(tables))
         tb_alias = aliases.get(table, "")
         tb_count[table] = 1
         for fk in foreigns:
@@ -86,26 +85,33 @@ class SqlJoin:
                 # i.e. cols_by_tbl contains such data
                 # {'res_company': ['name'], 'res_partner': ['name', 'ref']}
                 for col in cols_by_tbl[fk["to_table"]]:
-                    already_col = [x for x in col_names if fk["foreign_key"] in x]
-                    if already_col:
+                    if fk["foreign_key"] in cols.keys():
                         # a field is already set with this foreign key
-                        if json_by_tbl.get(fk["to_table"]):
-                            # there is a jsonb in selected column,
-                            # we can't aggregate easily jsonb with other column
-                            # then we stop process for this table
-                            continue
-                        idx = already_col[0].find(fk["foreign_key"])
                         new_col = f"{foreign_alias}.{col}"
-                        replacement = already_col[0].replace(
-                            " AS", f" || ', ' || {new_col} AS"
-                        )
-                        col_names[col_names.index(already_col[0])] = replacement
+                        if json_by_tbl.get(fk["to_table"]):
+                            keys = json_by_tbl.get(fk["to_table"]).get(col)
+                            if (
+                                keys
+                                and self.fallback_json_key in keys
+                                and self.json_key_pref in keys
+                            ):
+                                new_col = (
+                                    f"CASE WHEN {foreign_alias}.{col}->>'"
+                                    + f"{self.json_key_pref}' IS NOT NULL THEN "
+                                    + f"{foreign_alias}.{col}->>'{self.json_key_pref}' "
+                                    + f"ELSE {foreign_alias}.{col}->>'"
+                                    + f"{self.fallback_json_key}' END"
+                                )
+                            else:
+                                # there is a jsonb in selected column,
+                                # but identified keys doesn't allow to aggregate data
+                                # then we stop process for this table
+                                continue
+                        # We complete col with other col
+                        cols[fk["foreign_key"]] += f" || ', ' || {new_col}"
                     else:
                         # here we keep the original column i.e. partner_id
-                        col_names.append(
-                            f'{foreign_alias}.{col} AS "{fk["foreign_key"]}'
-                            + f'{as_clause_override(col)}"'
-                        )
+                        cols[fk["foreign_key"]] = f"{foreign_alias}.{col}"
             joins.append(
                 # compute join: i.e. LEFT JOIN res_users u2 ON u2.id = u.create_uid
                 f"\n  LEFT JOIN {fk['to_table']} {foreign_alias} ON "
@@ -113,37 +119,70 @@ class SqlJoin:
                 + f".{fk['column']} = {tb_alias or table}.{fk['foreign_key']}"
             )
         col_str, cols_list = "", []
-        if col_names:
-            # col_names contains such data [['c.name'], ['p.name', 'p.ref']]
-            cols = []
-            for x in col_names:
-                cols.append(x)
-            col_str = ", ".join(col_names) + ","
+        if cols:
+            col_str = ", ".join([f"{string} AS {key}" for key, string in cols.items()])
+        all_cols = (
+            self.get_df(get_columns_in_tables([table])).get_column("column").to_list()
+        )
+        other_cols = [
+            f"{tb_alias or table}.{x}" for x in all_cols if x not in cols.keys()
+        ]
         join_clause = " ".join(joins)
         if not joins:
             logger.info(f"No joins found for '{table}' table.")
             return False, False
-        asterisk_cols = f"{tb_alias}.*"
-        sql = f"SELECT {col_str} {tb_alias or table}{asterisk_cols}\n"
-        sql += f"FROM {table} {tb_alias} {join_clause}"
+        sql = f"SELECT {col_str}\n"
+        if other_cols:
+            sql += f", {', '.join(other_cols)}"
+        sql += f"\nFROM {table} {tb_alias} {join_clause}"
         logger.info(f"Sql generated for '{table}' table")
-        return sql, asterisk_cols
+        return sql
 
     def _search_columns(self, tables: list):
         """search for self.columns in the given tables."""
-        sql = get_columns_in_tables(tables=tables, column_names=self.columns)
-        df = cx.read_sql(self.conn, sql, return_type="polars")
+
+        df = self.get_df(
+            get_columns_in_tables(tables=tables, column_names=self.columns)
+        )
         cols_by_tbl = {
             x["table"]: x["column"]
             for x in df.group_by("table").agg(pl.col("column")).to_dicts()
         }
+        df = self.get_df(
+            get_json_col_in_tables(tables=tables, column_names=self.columns)
+        )
         json_by_tbl = {
             x["table"]: x["column"]
-            for x in df.filter(pl.col("data_type") == "jsonb")
-            .select(["table", "column"])
-            .to_dicts()
+            for x in df.group_by("table").agg(pl.col("column")).to_dicts()
         }
-        return cols_by_tbl, json_by_tbl
+        json_keys = defaultdict(dict)
+
+        def get_dict_keys_by_col(df):
+            return {
+                row["col"]: row["key"]
+                for row in df.group_by("col").agg(pl.col("key")).to_dicts()
+            }
+
+        for tbl, cols in json_by_tbl.items():
+            sql = (
+                get_keys_in_json_col(tbl, cols)
+                .replace("\n", " ")
+                .replace("',)", "')")  # tuple with one value only
+            )
+            sql = self.get_df(sql).get_column("?column?").to_list()[0]
+            keys_by_col = get_dict_keys_by_col(self.get_df(sql))
+            json_keys[tbl] = keys_by_col
+        return cols_by_tbl, json_keys
+
+    def get_df(self, sql):
+        "Get dataframe from an sql query"
+        return cx.read_sql(self.conn, sql, return_type="polars")
+
+    def set_json_key_pref(self, key: str) -> None:
+        self.json_key_pref = key
+
+    def set_fallback_json_key(self, key: str) -> None:
+        self.fallback_json_key = key
 
     def set_aliases(self, aliases: dict[str, str]) -> None:
         """

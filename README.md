@@ -30,6 +30,7 @@ This allows you to retrieve data from a source table and all its related tables 
 
 ## Usage
 
+### Get info on foreign keys
 
 ```python
 
@@ -62,6 +63,7 @@ conn.get_joins(table="res_users", dataframe=False)
 Dataset comes from [Odoo business app](https://github.com/odoo/odoo),
 but you can use it with any PostgreSQL database.
 
+### Define table aliases
 
 ```python
 
@@ -70,7 +72,7 @@ conn.set_aliases(
     {"res_company": "company", "res_partner": "partner", 'res_users': 'user_'}
 )
 
-sql, _ = conn.get_joined_query(table="res_users")
+sql = conn.get_joined_query(table="res_users")
 print(sql)
 
 ```
@@ -79,22 +81,24 @@ give an auto-joined query output
 
 
 ```sql
-SELECT user_.* FROM res_users user_
+SELECT user_.my_field1, ...
+FROM res_users user_
   LEFT JOIN res_company company ON company.id = user_.company_id
   LEFT JOIN res_partner partner ON partner.id = user_.partner_id
   LEFT JOIN res_users user_2 ON user_2.id = user_.create_uid
   LEFT JOIN res_users user_3 ON user_3.id = user_.write_uid
 ```
 
+### Replace foreign key ids by meaningful columns from foreign tables
 
 ```python
 # Optionally, you may want retrieve particulars fields
 # from foreign table you may specify before previous command
 
+# here we consider that all foreign table have name, ref or code
 conn.set_columns_to_retrieve(["name", "ref", "code"])
 sql, _ = conn.get_joined_query(table="res_users")
 print(sql)
-
 ```
 
 with this result
@@ -102,12 +106,23 @@ with this result
 ```sql
 SELECT company.name AS "company_id"
   , partner.name || ', ' || partner.ref AS "partner_id"
-  , user_user_.*
+  , user_.my_field1, ... 
 FROM res_users user_ 
   LEFT JOIN res_company company ON company.id = user_.company_id
   LEFT JOIN res_partner partner ON partner.id = user_.partner_id
   LEFT JOIN res_users user_2 ON user_2.id = user_.create_uid
   LEFT JOIN res_users user_3 ON user_3.id = user_.write_uid
+```
+
+### Json case
+
+Such fields store several values according to keys.
+Depending on the user, you may be interest by some keys instead of other ones.
+
+```python
+# With these settings the 'fr_FR' will be selected when existing, when not 'en_US'
+conn.set_json_key_pref("fr_FR")
+conn.set_fallback_json_key("en_US")
 ```
 
 ## Use case

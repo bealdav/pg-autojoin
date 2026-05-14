@@ -32,11 +32,41 @@ def get_foreign_keys_query(table: str):
       """
 
 
-def get_columns_in_tables(tables: list, column_names: list):
-    return f"""
+def get_columns_in_tables(tables: list, column_names: list = None):
+    sql = f"""
     SELECT table_name AS "table", column_name AS "column", data_type
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name IN {tuple(tables)}
-      AND column_name IN {tuple(column_names)}
     """
+    if column_names:
+        sql += f"\nAND column_name IN {tuple(column_names)}"
+    return sql.replace(",)", ")")
+
+
+def get_json_col_in_tables(tables: list, column_names: list = None):
+    sql = f"""
+    SELECT table_name AS "table", column_name AS "column"
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name IN {tuple(tables)}
+      AND data_type = 'jsonb'
+      """
+    if column_names:
+        sql += f"\nAND column_name IN {tuple(column_names)}"
+    return sql.replace(",)", ")")
+
+
+def get_keys_in_json_col(table: str, onlycols: list):
+    sql = f"""SELECT string_agg('SELECT ''' || column_name || ''' AS col, key, count(*) AS occurrences
+FROM {table}, LATERAL jsonb_each(COALESCE(' || column_name || ', ''substitute_me''::jsonb)) AS kv(key, value)
+GROUP BY key',
+    E'\nUNION ALL\n'
+  ) || E'\nORDER BY col, occurrences DESC;'
+FROM information_schema.columns
+WHERE table_name = '{table}'
+  AND table_schema = 'public'
+  AND column_name IN {tuple(onlycols)}
+  AND data_type = 'jsonb'"""
+    # in f-strings we can't use empty {}
+    return sql.replace("substitute_me", "{}")

@@ -1,6 +1,6 @@
 [project]
 name = "pg-autojoin"
-version = "0.4.0"
+version = "0.5.0"
 description = "Make a generic sql query with auto-join support for PostgreSQL towards foreign keys."
 readme = "README.md"
 license = { text = "AGPL-3.0-or-later" }
@@ -12,7 +12,7 @@ maintainers = [
     { name = "David BEAL", email = "david.beal@akretion.com" },
 ]
 dependencies = [
-    "connectorx>=0.4.3",
+    "connectorx",
 ]
 keywords = [ "postgresql", "foreign keys", "sql", "join", "connectorx" ]
 
