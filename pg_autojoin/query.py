@@ -57,7 +57,7 @@ def get_json_col_in_tables(tables: list, column_names: list = None):
     return sql.replace(",)", ")")
 
 
-def get_keys_in_json_col(table: str, onlycols: list):
+def get_keys_in_json_col(table: str, onlycols: list = None):
     sql = f"""SELECT string_agg('SELECT ''' || column_name || ''' AS col, key, count(*) AS occurrences
 FROM {table}, LATERAL jsonb_each(COALESCE(' || column_name || ', ''substitute_me''::jsonb)) AS kv(key, value)
 GROUP BY key',
@@ -66,7 +66,9 @@ GROUP BY key',
 FROM information_schema.columns
 WHERE table_name = '{table}'
   AND table_schema = 'public'
-  AND column_name IN {tuple(onlycols)}
-  AND data_type = 'jsonb'"""
+  AND data_type = 'jsonb'
+  """
+    if onlycols:
+        sql += f"AND column_name IN {tuple(onlycols)}"
     # in f-strings we can't use empty {}
     return sql.replace("substitute_me", "{}")

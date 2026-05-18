@@ -125,6 +125,14 @@ conn.set_json_key_pref("fr_FR")
 conn.set_fallback_json_key("en_US")
 ```
 
+### Ignore some columns
+
+Some may want not retrieve some columns.
+
+```python
+conn.set_columns_to_ignore(['colA', 'colD'])
+```
+
 ## Use case
 
 You dynamically want to produce dataset with relevant data only from a source table.
