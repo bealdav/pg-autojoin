@@ -17,13 +17,13 @@ class SqlJoin:
     # dsn
     conn: str
     # alias mapping for table names
-    aliases: dict = None
+    aliases: dict = {}
     # columns to search in foreign tables
     # the attribute is defined globally because in structured app
     # there is a recurrency in column names
-    columns: list = None
+    columns: list = []
     # columns in main table to ignore
-    columns_to_ignore: list = None
+    columns_to_ignore: list = []
 
     def __init__(
         self,
